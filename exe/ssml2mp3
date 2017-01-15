@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+
+$LOAD_PATH.unshift File.expand_path('../../lib', __FILE__)
+require 'ssml2mp3'
+
+if ARGV.size == 0
+  puts "#$0 ssml mp3"
+  exit
+end
+
+ssml_path, mp3_path = ARGV
+
+Ssml2mp3.synthesize_file(ssml_path, mp3_path)
