@@ -1,11 +1,13 @@
 require "spec_helper"
 
 describe Ssml2mp3 do
-  it "has a version number" do
-    expect(Ssml2mp3::VERSION).not_to be nil
-  end
+  descirbe ".synthesize" do
+    let(:ssml) { File.read(fixture_path("hashire_merosu.ssml")) }
 
-  it "does something useful" do
-    expect(false).to eq(true)
+    it do
+      File.open("tmp/merosu.mp3", "wb") do |output|
+        Ssml2mp3.synthesize(ssml, output)
+      end
+    end
   end
 end
