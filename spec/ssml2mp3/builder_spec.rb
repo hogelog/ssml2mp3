@@ -5,7 +5,7 @@ describe Ssml2mp3::Builder do
   let(:ssml) { File.read(fixture_path("hashire_merosu.ssml")) }
 
   describe ".split_ssml" do
-    subject { builder.split_ssml }
+    subject { builder.split_ssml(ssml) }
 
     it do
       is_expected.not_to eq(0)
