@@ -1,7 +1,6 @@
 require "aws-sdk-polly"
 require "logger"
 require "nokogiri"
-require "htmlentities"
 require "expeditor"
 require "concurrent"
 require "tmpdir"
@@ -26,7 +25,6 @@ module Ssml2mp3
           max_threads: @max_threads,
         )
       )
-      @htmlentities = HTMLEntities.new
     end
 
     def synthesize_file(ssml_path, mp3_path)
@@ -86,39 +84,42 @@ module Ssml2mp3
       elements = doc.root.children
 
       header = (%r((.+<speak[^>]+>))m === ssml && $1)
-      split_ssml_(elements, "", []).map do |body_ssml|
+
+      results = []
+      buffer = ""
+
+      while elements.size > 0 do
+        element = elements.shift
+
+        case element
+          when Nokogiri::XML::Text
+            text = html_encode(element.text)
+          when String
+            text = html_encode(element)
+          else
+            buffer += element.to_s
+            next
+        end
+
+        if text.size > POLLY_TEXT_LENGTH_LIMIT
+          split_texts = text.chars.each_slice(POLLY_TEXT_LENGTH_LIMIT).map(&:join)
+          elements = split_texts + elements
+          next
+        end
+
+        if text_size(buffer + text) > POLLY_TEXT_LENGTH_LIMIT
+          results << buffer
+          buffer = ""
+        end
+
+        buffer += text
+      end
+
+      results << buffer if buffer.size > 0
+
+      results.map do |body_ssml|
         header + body_ssml + "</speak>"
       end
-    end
-
-    def split_ssml_(elements, buffer, results)
-      if elements.empty?
-        return buffer.size > 0 ? results << buffer : results
-      end
-
-      element = elements.shift
-
-      case element
-        when Nokogiri::XML::Text
-          text = @htmlentities.encode(element.text)
-        when String
-          text = @htmlentities.encode(element)
-        else
-          return split_ssml_(elements, buffer + element.to_s, results)
-      end
-
-      if text_size(text) > POLLY_TEXT_LENGTH_LIMIT
-        split_texts = text.chars.each_slice(POLLY_TEXT_LENGTH_LIMIT).map(&:join)
-        elements = split_texts + elements
-        return split_ssml_(split_texts + elements, buffer, results)
-      end
-
-      if text_size(buffer + text) > POLLY_TEXT_LENGTH_LIMIT
-        results << buffer
-        buffer = ""
-      end
-
-      split_ssml_(elements, buffer + text, results)
     end
 
     def text_size(text)
@@ -131,6 +132,10 @@ module Ssml2mp3
         gsub("<p>", "").
         gsub("</p>", '<break strength="strong"/>').
         gsub(/([」】）』])/, '\1<break strength="strong"/>')
+    end
+
+    def html_encode(text)
+      text.gsub(/</, "&lt;").gsub(/>/, "&gt;")
     end
   end
 end
